@@ -49,6 +49,12 @@ pub fn run<'a>(memory: &mut Memory) -> Result<(), Error> {
 
                 pc + 3
             }
+            // add_immediate
+            [0x05, reg, constant, ..] => {
+                registers[usize::from(reg)] = registers[usize::from(reg)] + i16::from(constant);
+
+                pc + 3
+            }
             // halt
             [0xff, ..] => {
                 return Ok(());
@@ -108,7 +114,7 @@ mod tests {
     #[test]
     fn can_add() {
         #[rustfmt::skip]
-        assert_eq!(Ok(5293), test_helper([
+        assert_eq!(Ok(5281 + 12), test_helper([
             0x01, 0x01, 0x10,
             0x01, 0x02, 0x12,
             0x03, 0x01, 0x02,
@@ -118,15 +124,32 @@ mod tests {
             0x00, 0x00,
             // 161 + 20 * 2^8
             0xa1, 0x14,
-            // 13
+            // 12
             0x0c, 0x00
+        ]));
+    }
+
+    #[test]
+    fn can_add_immediate() {
+        #[rustfmt::skip]
+        assert_eq!(Ok(5281 + 2), test_helper([
+            0x01, 0x01, 0x10,
+            0x05, 0x01, 0x02,
+            0x02, 0x01, 0x0e,
+            0xff,
+            0x00,
+            0x00, 0x00,
+            0x00, 0x00, 0x00,
+            // 161 + 20 * 2^8
+            0xa1, 0x14,
+            0x00, 0x00
         ]));
     }
 
     #[test]
     fn can_sub() {
         #[rustfmt::skip]
-        assert_eq!(Ok(5269), test_helper([
+        assert_eq!(Ok(5281 - 12), test_helper([
             0x01, 0x01, 0x10,
             0x01, 0x02, 0x12,
             0x04, 0x01, 0x02,
@@ -136,7 +159,7 @@ mod tests {
             0x00, 0x00,
             // 161 + 20 * 2^8
             0xa1, 0x14,
-            // 13
+            // 12
             0x0c, 0x00
         ]));
     }
@@ -144,7 +167,7 @@ mod tests {
     #[test]
     fn can_sub_negative() {
         #[rustfmt::skip]
-        assert_eq!(Ok(-5269), test_helper([
+        assert_eq!(Ok(12 - 5281), test_helper([
             0x01, 0x01, 0x10,
             0x01, 0x02, 0x12,
             0x04, 0x01, 0x02,
@@ -152,7 +175,7 @@ mod tests {
             0xff,
             0x00,
             0x00, 0x00,
-            // 13
+            // 12
             0x0c, 0x00,
             // 161 + 20 * 2^8
             0xa1, 0x14,
