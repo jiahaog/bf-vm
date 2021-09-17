@@ -11,7 +11,7 @@ fn main() {
         0x00,
         0x00, 0x00,
         0xa1, 0x14,
-        0x0c, 0x00
+        0x0c, 0x00,
     ];
 
     let mut memory = vm::Memory::new(&mut raw_memory);
