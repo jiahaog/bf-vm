@@ -4,21 +4,26 @@ use std::fmt;
 pub enum Error {
     // Out of bounds while accessing memory at offset.
     OutOfBounds(u16),
+    // PC was somehow negative.
+    NegativePc,
 }
 
 pub fn run<'a>(memory: &mut Memory) -> Result<(), Error> {
-    let mut registers: [u16; 3] = [0; 3];
+    let mut registers: [i16; 3] = [0; 3];
 
     loop {
         let pc = registers[0];
+        if pc < 0 {
+            return Err(Error::NegativePc);
+        }
 
         // Don't keep a mutable reference on pc, so the other registers can be
         // easily accessed.
-        registers[0] = match memory.0[usize::from(pc)..] {
+        registers[0] = match memory.0[usize::from(pc as u16)..] {
             // load_word
             [0x01, reg, addr, ..] => {
                 registers[usize::from(reg)] =
-                    u16::from_le_bytes([*memory.get_mut(addr)?, *memory.get_mut(addr + 1)?]);
+                    i16::from_le_bytes([*memory.get_mut(addr)?, *memory.get_mut(addr + 1)?]);
                 pc + 3
             }
             // store_word
@@ -90,14 +95,14 @@ impl<'a> fmt::Display for Memory<'a> {
 mod tests {
     use super::*;
 
-    fn test_helper(raw_memory: [u8; 20]) -> Result<u16, Error> {
+    fn test_helper(raw_memory: [u8; 20]) -> Result<i16, Error> {
         let mut raw_memory = raw_memory;
 
         let mut memory = Memory::new(&mut raw_memory);
 
         run(&mut memory)?;
 
-        Ok(u16::from_le_bytes([raw_memory[0x0e], raw_memory[0x0f]]))
+        Ok(i16::from_le_bytes([raw_memory[0x0e], raw_memory[0x0f]]))
     }
 
     #[test]
@@ -111,10 +116,47 @@ mod tests {
             0xff,
             0x00,
             0x00, 0x00,
+            // 161 + 20 * 2^8
             0xa1, 0x14,
+            // 13
             0x0c, 0x00
         ]));
     }
 
+    #[test]
+    fn can_sub() {
+        #[rustfmt::skip]
+        assert_eq!(Ok(5269), test_helper([
+            0x01, 0x01, 0x10,
+            0x01, 0x02, 0x12,
+            0x04, 0x01, 0x02,
+            0x02, 0x01, 0x0e,
+            0xff,
+            0x00,
+            0x00, 0x00,
+            // 161 + 20 * 2^8
+            0xa1, 0x14,
+            // 13
+            0x0c, 0x00
+        ]));
+    }
+
+    #[test]
+    fn can_sub_negative() {
+        #[rustfmt::skip]
+        assert_eq!(Ok(-5269), test_helper([
+            0x01, 0x01, 0x10,
+            0x01, 0x02, 0x12,
+            0x04, 0x01, 0x02,
+            0x02, 0x01, 0x0e,
+            0xff,
+            0x00,
+            0x00, 0x00,
+            // 13
+            0x0c, 0x00,
+            // 161 + 20 * 2^8
+            0xa1, 0x14,
+        ]));
+    }
     // TODO: Add more tests.
 }
