@@ -1,39 +1,42 @@
+use super::instruction::*;
 use super::Error;
 
-pub fn decompile(memory: &[u8]) -> Result<Vec<String>, Error> {
-    let (current, next) = match memory {
-        [0x01, reg, addr, ..] => (format!("load_word r{} ({:#04x})", reg, addr), &memory[3..]),
-        [0x02, reg, addr, ..] => (format!("store_word r{} ({:#04x})", reg, addr), &memory[3..]),
-        // add
-        [0x03, first_reg, second_reg, ..] => {
-            (format!("add r{} r{}", first_reg, second_reg), &memory[3..])
-        }
-        // sub
-        [0x04, first_reg, second_reg, ..] => {
-            (format!("sub r{} r{}", first_reg, second_reg), &memory[3..])
-        }
-        // add_immediate
-        [0x05, reg, constant, ..] => (
-            format!("add_immediate r{} ({:#04x})", reg, constant),
-            &memory[3..],
-        ),
-        // branch_if_eq
-        [0x06, first_reg, second_reg, new_pc, ..] => (
-            format!(
-                "branch_if_eq r{} r{} {:#04x}",
-                first_reg, second_reg, new_pc
-            ),
-            &memory[4..],
-        ),
-        // halt
-        [0xff, ..] => ("halt".to_string(), &memory[1..]),
-        [x, ..] => (format!("{:#04x}", x), &memory[1..]),
+pub fn decompile(memory: &[u8]) -> Result<Vec<Instruction>, Error> {
+    let instruction = match memory {
+        [0x01, reg, addr, ..] => Instruction::LoadWord {
+            reg: *reg,
+            addr: *addr,
+        },
+        [0x02, reg, addr, ..] => Instruction::StoreWord {
+            reg: *reg,
+            addr: *addr,
+        },
+        [0x03, first_reg, second_reg, ..] => Instruction::Add {
+            first_reg: *first_reg,
+            second_reg: *second_reg,
+        },
+        [0x04, first_reg, second_reg, ..] => Instruction::Sub {
+            first_reg: *first_reg,
+            second_reg: *second_reg,
+        },
+        [0x05, reg, constant, ..] => Instruction::AddImmediate {
+            reg: *reg,
+            constant: *constant,
+        },
+        [0x06, first_reg, second_reg, new_pc, ..] => Instruction::BranchIfEq {
+            first_reg: *first_reg,
+            second_reg: *second_reg,
+            new_pc: *new_pc,
+        },
+        [0xff, ..] => Instruction::Halt,
+        [x, ..] => Instruction::Unknown(*x),
         [] => return Ok(vec![]),
     };
 
-    let mut result = vec![current];
+    let instruction_size = usize::from(instruction.size());
+    let mut result = vec![instruction];
 
-    let next_result = decompile(next)?;
+    let next_result = decompile(&memory[instruction_size..])?;
     result.extend(next_result);
 
     Ok(result)
@@ -44,36 +47,68 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decompiles() {
+    fn decompiles_1() {
         #[rustfmt::skip]
         assert_eq!(
             Ok(
-"load_word r1 (0x10)
-add_immediate r1 (0x02)
-store_word r1 (0x0e)
+"load_word r1 (0x01)
+store_word r1 (0x02)
+add r1 r2
+sub r2 r1
+add_immediate r1 (0x01)
 halt
-0x00
-0x00
-0x00
-0x00
-0x00
-0x00
 0xa1
 0x14
 0x00
 0x00"
             .to_string()),
             decompile(&[
-                0x01, 0x01, 0x10,
-                0x05, 0x01, 0x02,
-                0x02, 0x01, 0x0e,
+                0x01, 0x01, 0x01,
+                0x02, 0x01, 0x02,
+                0x03, 0x01, 0x02,
+                0x04, 0x02, 0x01,
+                0x05, 0x01, 0x01,
                 0xff,
-                0x00, 0x00, 0x00,
-                0x00, 0x00, 0x00,
                 0xa1, 0x14,
                 0x00, 0x00,
             ])
-            .map(|x| x.join("\n")),
+            .map(|x| instructions_to_string(x)),
+        );
+    }
+
+    #[test]
+    fn decompiles_2() {
+        #[rustfmt::skip]
+        assert_eq!(
+            Ok(
+"branch_if_eq r1 r2 0x06
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00
+0x00"
+            .to_string()),
+            decompile(&[
+                0x06, 0x01, 0x02, 0x06,
+                0x00,
+                0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+            ])
+            .map(|x| instructions_to_string(x)),
         );
     }
 }

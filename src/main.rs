@@ -15,11 +15,14 @@ fn main() {
     ];
 
     let decompiled = vm::compiler::decompile(&raw_memory).expect("Can decompile the memory");
-    eprintln!("Decompiled:\n\n{}\n", decompiled.join("\n"));
+    eprintln!(
+        "Decompiled:\n\n{}\n",
+        vm::instruction::instructions_to_string(decompiled)
+    );
 
     eprintln!("Executing...\n");
 
-    let mut memory = vm::Memory::new(&mut raw_memory);
+    let mut memory = vm::memory::Memory::new(&mut raw_memory);
 
     vm::run(&mut memory).expect("Should complete successfully");
 
