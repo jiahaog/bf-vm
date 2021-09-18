@@ -14,13 +14,20 @@ fn main() {
         0x0c, 0x00,
     ];
 
+    let decompiled = vm::compiler::decompile(&raw_memory).expect("Can decompile the memory");
+    eprintln!("Decompiled:\n\n{}\n", decompiled.join("\n"));
+
+    eprintln!("Executing...\n");
+
     let mut memory = vm::Memory::new(&mut raw_memory);
 
     vm::run(&mut memory).expect("Should complete successfully");
 
-    println!("Final memory:\n\n{}\n", memory);
+    eprintln!("Final memory:\n\n{}\n", memory);
+    eprintln!("Output:");
+
     println!(
-        "Output is `{}`",
+        "{}",
         u16::from_le_bytes([raw_memory[0x0e], raw_memory[0x0f]])
     );
 }
